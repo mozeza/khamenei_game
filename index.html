@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>מאר-מיגאי: גרסת המובייל!</title>
+    <style>
+        :root {
+            --bg: #05070a;
+            --panel: #1b1f24;
+            --kham-red: #ff3d00;
+            --bibi-blue: #2979ff;
+            --trump-gold: #ffc107;
+        }
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: none; /* מונע גלילה וזום בזמן המשחק */
+        }
+        body {
+            margin: 0;
+            background-color: var(--bg);
+            color: #fff;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: none;
+            user-select: none;
+        }
+
+        /* סמן הנשק - מותאם גם למובייל */
+        #weapon-cursor {
+            position: fixed;
+            pointer-events: none;
+            z-index: 10000;
+            width: 80px;
+            height: 80px;
+            font-size: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform-origin: center center;
+            transform: translate(-50%, -50%) rotate(var(--base-rot, 0deg));
+            transition: transform 0.05s linear;
+        }
+        @media (max-width: 600px) {
+            #weapon-cursor { width: 60px; height: 60px; font-size: 45px; }
+        }
+        
+        #weapon-cursor.swinging { animation: swing 0.1s ease-out; }
+        @keyframes swing {
+            0% { transform: translate(-50%, -50%) rotate(var(--base-rot, 0deg)); }
+            50% { transform: translate(-50%, -50%) rotate(calc(var(--base-rot, 0deg) - 70deg)) scale(1.2); }
+            100% { transform: translate(-50%, -50%) rotate(var(--base-rot, 0deg)); }
+        }
+
+        .header-ui {
+            width: 100%;
+            max-width: 1000px;
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            z-index: 10;
+        }
+
+        .stat-card {
+            background: var(--panel);
+            padding: 5px 10px;
+            border-radius: 10px;
+            border: 1px solid #30363d;
+            text-align: center;
+            min-width: 80px;
+        }
+        .score-val { font-size: 1.5rem; font-weight: 900; color: var(--kham-red); }
+        .time-val { font-size: 1.5rem; font-weight: bold; }
+        
+        .leaderboard-card {
+            background: var(--panel);
+            padding: 8px;
+            border-radius: 10px;
+            border: 1px solid var(--trump-gold);
+            min-width: 150px;
+            max-height: 120px;
+            overflow-y: auto;
+            font-size: 0.7rem;
+        }
+
+        .game-area {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            width: 95%;
+            max-width: 600px;
+            margin-top: 20px;
+        }
+
+        .hole {
+            aspect-ratio: 1 / 0.8;
+            background: radial-gradient(circle, #000 30%, #111 80%, #222 100%);
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+            border-bottom: 8px solid #161b22;
+            box-shadow: inset 0 5px 15px rgba(0,0,0,1);
+        }
+
+        .mole {
+            width: 85%;
+            height: 85%;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center center;
+            position: absolute;
+            top: 100%;
+            left: 7.5%;
+            transition: top 0.1s cubic-bezier(.17,.67,.41,1.1);
+        }
+        .mole.up { top: 5%; }
+
+        .controls {
+            margin-top: 15px;
+            background: var(--panel);
+            padding: 15px;
+            border-radius: 20px;
+            border: 2px solid #30363d;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            width: 90%;
+            max-width: 400px;
+            z-index: 100;
+        }
+
+        .legend { display: flex; gap: 10px; margin-bottom: 5px; }
+        .legend-item { display: flex; flex-direction: column; align-items: center; font-size: 0.7rem; }
+        .legend-img { width: 30px; height: 30px; border-radius: 50%; background-size: cover; }
+
+        .weapon-selector, .diff-selector { display: flex; gap: 8px; }
+        .weapon-btn, .diff-btn {
+            background: #21262d;
+            border: 1px solid #30363d;
+            color: #fff;
+            padding: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+        .weapon-btn { font-size: 1.5rem; }
+        .active { border-color: var(--trump-gold); background: rgba(255, 193, 7, 0.2) !important; }
+
+        .start-btn {
+            background: linear-gradient(135deg, var(--kham-red), #d32f2f);
+            color: white;
+            border: none;
+            padding: 10px 40px;
+            font-size: 1.4rem;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: 900;
+        }
+
+        .flash { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 999; opacity: 0; }
+        .flash-red { animation: flashR 0.3s; }
+        .flash-blue { animation: flashB 0.3s; }
+        .flash-death { animation: flashD 0.8s forwards; }
+        @keyframes flashR { 0% { opacity: 0.4; background: red; } 100% { opacity: 0; } }
+        @keyframes flashB { 0% { opacity: 0.4; background: blue; } 100% { opacity: 0; } }
+        @keyframes flashD { 0% { opacity: 0.8; background: red; } 100% { opacity: 0; } }
+
+        .effect { position: absolute; pointer-events: none; font-weight: 900; font-size: 1.5rem; z-index: 1000; animation: effectPop 0.5s forwards; color: #fff; text-shadow: 0 0 10px #000; }
+        @keyframes effectPop { 0% { transform: scale(0.2); opacity: 1; } 100% { transform: scale(2); opacity: 0; } }
+    </style>
+</head>
+<body id="main">
+    <div id="weapon-cursor" style="--base-rot: 0deg;">🔨</div>
+    <div class="flash" id="screenFlash"></div>
+
+    <div class="header-ui">
+        <div class="stat-card">
+            <div style="font-size: 0.6rem; opacity: 0.7;">SCORE</div>
+            <div class="score-val" id="score">0</div>
+        </div>
+        <div style="text-align: center;">
+            <h2 style="margin:0; color:var(--kham-red); font-size: 1rem;">MEGA WHACK</h2>
+            <div class="time-val" id="time">30</div>
+        </div>
+        <div class="leaderboard-card">
+            <ul id="highScores" style="list-style: none; padding: 0; margin: 0; text-align: right;"></ul>
+        </div>
+    </div>
+
+    <div class="game-area">
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+    </div>
+
+    <div class="controls" id="controls">
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-img" style="background-image: url('assets/circle_clipboard-1772346852583.png');"></div>
+                <div style="color:var(--kham-red)">+1</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-img" style="background-image: url('assets/circle_clipboard-1772347209026.png');"></div>
+                <div style="color:var(--bibi-blue)">-3</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-img" style="background-image: url('assets/circle_clipboard-1772347702052.png');"></div>
+                <div style="color:red">פסילה!</div>
+            </div>
+        </div>
+
+        <div class="weapon-selector">
+            <button class="weapon-btn active" onclick="setWeapon('🔨', '0deg', this)">🔨</button>
+            <button class="weapon-btn" onclick="setWeapon('🍳', '150deg', this)">🍳</button>
+            <button class="weapon-btn" onclick="setWeapon('🏏', '165deg', this)">🏏</button>
+        </div>
+        
+        <div class="diff-selector">
+            <button class="diff-btn active" onclick="setDiff('easy', this)">קל</button>
+            <button class="diff-btn" onclick="setDiff('medium', this)">בינוני</button>
+            <button class="diff-btn" onclick="setDiff('hard', this)">קשה</button>
+        </div>
+        
+        <button class="start-btn" onclick="startGame()">צא לקרב!</button>
+    </div>
+
+<script>
+    const assetsDir = 'assets/';
+    const khameneis = [assetsDir+'circle_clipboard-1772346852583.png', assetsDir+'circle_clipboard-1772347049193.png', assetsDir+'circle_clipboard-1772347061361.png', assetsDir+'circle_clipboard-1772347070739.png'];
+    const bibis = [assetsDir+'circle_clipboard-1772347209026.png', assetsDir+'circle_clipboard-1772347215406.png'];
+    const trumps = [assetsDir+'circle_clipboard-1772347702052.png', assetsDir+'circle_clipboard-1772347714999.png', assetsDir+'circle_clipboard-1772347733511.png'];
+
+    let score = 0; let timeLeft = 30; let gameActive = false;
+    let difficulty = 'easy'; let peepTimer; let countdownTimer;
+
+    const diffSettings = {
+        easy: { min: 900, max: 1400, bibi: 0.15, trump: 0.05 },
+        medium: { min: 600, max: 1000, bibi: 0.25, trump: 0.08 },
+        hard: { min: 400, max: 700, bibi: 0.40, trump: 0.15 }
+    };
+
+    const weaponCursor = document.getElementById('weapon-cursor');
+    
+    // Pointer Events תומך גם בעכבר וגם במגע
+    document.addEventListener('pointermove', (e) => {
+        // במובייל נזיז את הנשק קצת מעל האצבע כדי שיראו אותו
+        const offset = e.pointerType === 'touch' ? 60 : 0;
+        weaponCursor.style.left = e.clientX + 'px';
+        weaponCursor.style.top = (e.clientY - offset) + 'px';
+    });
+
+    document.addEventListener('pointerdown', (e) => {
+        weaponCursor.classList.add('swinging');
+        setTimeout(() => weaponCursor.classList.remove('swinging'), 100);
+    });
+
+    function setWeapon(w, rot, btn) {
+        weaponCursor.textContent = w;
+        weaponCursor.style.setProperty('--base-rot', rot);
+        document.querySelectorAll('.weapon-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    function setDiff(d, btn) {
+        difficulty = d;
+        document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        updateHighScores();
+    }
+
+    function updateHighScores() {
+        const scores = JSON.parse(localStorage.getItem('megaLeaderboard_v6') || '{}');
+        const levelScores = scores[difficulty] || [];
+        const list = document.getElementById('highScores');
+        list.innerHTML = '<li><b>שיאים:</b></li>' + levelScores.slice(0, 5).map((s, i) => `<li>#${i+1} ${s.name} - ${s.score}</li>`).join('') || 'אין';
+    }
+
+    function saveScore(s) {
+        let scores = JSON.parse(localStorage.getItem('megaLeaderboard_v6') || '{}');
+        if (!scores[difficulty]) scores[difficulty] = [];
+        const minScore = scores[difficulty].length < 10 ? -Infinity : scores[difficulty][9].score;
+        if (s > minScore || scores[difficulty].length < 10) {
+            const userName = prompt("שיא חדש! הכנס שם:") || "אנונימי";
+            scores[difficulty].push({ name: userName, score: s });
+            scores[difficulty].sort((a, b) => b.score - a.score);
+            scores[difficulty] = scores[difficulty].slice(0, 10);
+            localStorage.setItem('megaLeaderboard_v6', JSON.stringify(scores));
+        }
+        updateHighScores();
+    }
+
+    function startGame() {
+        score = 0; timeLeft = 30; gameActive = true;
+        document.getElementById('score').textContent = '0';
+        document.getElementById('controls').style.display = 'none';
+        peep();
+        countdownTimer = setInterval(() => { timeLeft--; document.getElementById('time').textContent = timeLeft; if (timeLeft <= 0) endGame(); }, 1000);
+    }
+
+    function endGame(reason = 'הזמן נגמר!') {
+        gameActive = false; clearInterval(countdownTimer); clearTimeout(peepTimer);
+        document.getElementById('controls').style.display = 'flex';
+        saveScore(score);
+        alert(reason + ' ניקוד: ' + score);
+    }
+
+    function peep() {
+        if (!gameActive) return;
+        const holes = document.querySelectorAll('.hole');
+        const hole = holes[Math.floor(Math.random() * holes.length)];
+        const mole = hole.querySelector('.mole');
+        const rand = Math.random();
+        let type, imgSet;
+        if (rand < diffSettings[difficulty].trump) { type = 'trump'; imgSet = trumps; }
+        else if (rand < diffSettings[difficulty].trump + diffSettings[difficulty].bibi) { type = 'bibi'; imgSet = bibis; }
+        else { type = 'khamenei'; imgSet = khameneis; }
+        mole.style.backgroundImage = `url('${imgSet[Math.floor(Math.random()*imgSet.length)]}')`;
+        mole.dataset.type = type;
+        mole.classList.add('up');
+        const time = Math.random() * (diffSettings[difficulty].max - diffSettings[difficulty].min) + diffSettings[difficulty].min;
+        peepTimer = setTimeout(() => { mole.classList.remove('up'); if (gameActive) peep(); }, time);
+    }
+
+    document.querySelectorAll('.mole').forEach(m => {
+        m.addEventListener('pointerdown', function(e) {
+            if (!this.classList.contains('up') || !gameActive) return;
+            const type = this.dataset.type;
+            const target = this;
+            setTimeout(() => {
+                if (!target.classList.contains('up')) return;
+                if (type === 'trump') {
+                    target.classList.remove('up');
+                    triggerEffect(e.pageX, e.pageY, 'GAME OVER!', 'flash-death');
+                    setTimeout(() => endGame('פסילה! פגעת בטראמפ.'), 600);
+                    return;
+                }
+                target.classList.remove('up');
+                if (type === 'khamenei') {
+                    score++; triggerEffect(e.pageX, e.pageY, 'BOOM!', 'flash-red');
+                } else if (type === 'bibi') {
+                    score -= 3; triggerEffect(e.pageX, e.pageY, 'OOPS!', 'flash-blue');
+                }
+                document.getElementById('score').textContent = score;
+            }, 70);
+        });
+    });
+
+    function triggerEffect(x, y, text, flashClass) {
+        const el = document.createElement('div');
+        el.className = 'effect'; el.textContent = text; el.style.left = x + 'px'; el.style.top = y + 'px';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 500);
+        const flash = document.getElementById('screenFlash');
+        flash.className = 'flash ' + flashClass;
+        if (flashClass !== 'flash-death') setTimeout(() => flash.className = 'flash', 300);
+    }
+    updateHighScores();
+</script>
+</body>
+</html>
